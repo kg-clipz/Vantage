@@ -1,0 +1,12 @@
+{
+  "name": "vantage-mission-console",
+  "version": "1.0.0",
+  "description": "Vantage — Mission Console: a modular vanilla-JS space mission dashboard",
+  "type": "module",
+  "scripts": {
+    "build": "echo 'No build step required'",
+    "dev": "npx serve ."
+  },
+  "keywords": ["nasa", "space", "dashboard", "vanilla-js", "leaflet", "chartjs"],
+  "license": "MIT"
+}

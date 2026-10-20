@@ -1,0 +1,1117 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="referrer" content="strict-origin-when-cross-origin" />
+<title>Vantage — Mission Console</title>
+<!-- The mark as a favicon, inline so the page keeps working with no files beside it: an
+     orbital ring and the chevron, on the console's own background. -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230B0F17'/%3E%3Cellipse cx='16' cy='16' rx='13' ry='5.6' transform='rotate(-27 16 16)' fill='none' stroke='%235D7BFF' stroke-width='1.6' stroke-opacity='.75'/%3E%3Cpath d='M9 9l7 14 7-14' fill='none' stroke='%235D7BFF' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='26' cy='9' r='2.4' fill='%23B079FF'/%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <link rel="stylesheet" href="css/main.css">
+
+</head>
+<body>
+
+<aside>
+  <div class="logo">
+    <div class="mark" aria-hidden="true">
+      <svg viewBox="0 0 32 32" focusable="false">
+        <defs>
+          <linearGradient id="vantageMark" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#8FA6FF"/>
+            <stop offset=".55" stop-color="#5D7BFF"/>
+            <stop offset="1" stop-color="#B079FF"/>
+          </linearGradient>
+        </defs>
+        <ellipse cx="16" cy="16" rx="13.2" ry="5.7" transform="rotate(-27 16 16)" fill="none" stroke="url(#vantageMark)" stroke-width="1.7" stroke-opacity=".8"/>
+        <path d="M9.3 8.2 16 23.6l6.7-15.4" fill="none" stroke="url(#vantageMark)" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="26.4" cy="8.1" r="2.4" fill="#B079FF"/>
+      </svg>
+    </div>
+    <div><b>Vantage</b><span>MISSION CONSOLE</span></div>
+  </div>
+  <nav id="nav">
+    <button class="nav-btn active" data-view="overview"><span class="ico">◉</span> Overview</button>
+    <button class="nav-btn" data-view="sky"><span class="ico">✦</span> Sky &amp; Earth</button>
+    <button class="nav-btn" data-view="missions"><span class="ico">🚀</span> Missions <span class="nav-badge" id="badge-launches">…</span></button>
+    <button class="nav-btn" data-view="asteroids"><span class="ico">☄</span> Asteroids <span class="nav-badge" id="badge-neo">…</span></button>
+    <button class="nav-btn" data-view="mars"><span class="ico">◍</span> Mars</button>
+    <button class="nav-btn" data-view="weather"><span class="ico">☀</span> Space Weather <span class="nav-badge" id="badge-weather">…</span></button>
+    <button class="nav-btn" data-view="events"><span class="ico">🗺</span> Natural Events <span class="nav-badge" id="badge-events">…</span></button>
+    <!-- These were side drawers. They are pages now, so they sit in the nav with every other
+         page — and their badges earn their place by saying something before you click: how long
+         until the next scheduled event, and how many plumes are in your sky. The station's own
+         live picture is no longer a page of its own: its tracker is the first card
+         on the Overview, where it is the thing the console opens on. -->
+    <button class="nav-btn" data-view="jellyfish"><span class="ico">🌊</span> Space Jellyfish <span class="nav-badge" id="badge-jf">…</span></button>
+    <button class="nav-btn" data-view="timeline"><span class="ico">◷</span> Next 24 Hours <span class="nav-badge" id="badge-tl">…</span></button>
+    <button class="nav-btn" data-view="brief"><span class="ico">❯</span> Analysis</button>
+  </nav>
+  <div class="side-foot">
+    <div><span class="live-dot"></span>feeds live · auto-refresh</div>
+    <div>NASA · Launch Library 2 · where the ISS at?</div>
+    <div>DONKI · EONET · English basemap</div>
+    <button id="keyBtn" title="Use your own key to avoid demo-key rate limits" style="margin-top:8px;background:transparent;border:1px solid var(--line);color:var(--text-3);font-family:var(--font-mono);font-size:10.5px;padding:4px 8px;border-radius:6px;cursor:pointer">NASA key: demo</button>
+  </div>
+</aside>
+
+<div class="topbar">
+  <div class="tb-title">
+    <div class="crumb" id="crumb">console / overview</div>
+    <div class="view-title" id="viewTitle">Overview</div>
+  </div>
+  <div class="global-filter">
+    <span class="gf-label">GLOBAL RANGE</span>
+    <input type="date" id="gf-start" title="Start date — filters launches, NEO feed and EPIC imagery" />
+    <span class="gf-label">→</span>
+    <input type="date" id="gf-end" title="End date — filters launches, NEO feed and EPIC imagery" />
+    <select class="ctl" id="gf-preset" title="Quick range presets">
+      <option value="7">Next 7 days</option>
+      <option value="3" selected>Next 3 days</option>
+      <option value="1">Next 24 hours</option>
+      <option value="custom">Custom…</option>
+    </select>
+  </div>
+  <div class="utc-clock" id="utcClock"><b>--:--:--</b> UTC</div>
+  <div class="audio-wrap">
+    <button id="audioToggle" title="Ambient space audio — synthesised in the browser (key: m)" aria-label="Toggle ambient space audio" aria-pressed="false">♪</button>
+    <div class="audio-panel" id="audioPanel" role="dialog" aria-label="Ambient audio controls">
+      <h5>Ambient audio<span class="eq" id="audioEq"><i></i><i></i><i></i><i></i></span></h5>
+      <div class="row">
+        <span style="font-size:12px;color:var(--text-3)">vol</span>
+        <input type="range" id="audioVol" min="0" max="100" step="1" value="45" aria-label="Ambient audio volume" />
+        <span class="pct" id="audioPct">45%</span>
+      </div>
+      <div class="row" style="margin-top:10px"><button class="btn" id="audioStop" style="width:100%">stop</button></div>
+      <div class="note">A handpan-style drone generated live with the Web Audio API — nothing streamed, no audio files, nothing to license. Press <b>m</b> anywhere to toggle it.</div>
+    </div>
+  </div>
+  <div class="audio-wrap">
+    <button id="commsToggle" title="Mission audio — public space/ambient streams and your own feed (key: ,)" aria-label="Open mission audio controls" aria-pressed="false">📻</button>
+    <div class="audio-panel" id="commsPanel" role="dialog" aria-label="Mission audio controls">
+      <h5>Mission audio<span class="eq" id="commsEq"><i></i><i></i><i></i><i></i></span></h5>
+      <div class="cm-now">
+        <div>
+          <div class="t" id="commsNowTitle">not playing</div>
+          <div class="s" id="commsNowSub">pick a feed below</div>
+        </div>
+      </div>
+      <div class="row">
+        <span style="font-size:12px;color:var(--text-3)">vol</span>
+        <input type="range" id="commsVol" min="0" max="100" step="1" value="70" aria-label="Mission audio volume" />
+        <span class="pct" id="commsPct">70%</span>
+      </div>
+      <div class="cm-list" id="commsList" style="margin-top:10px"></div>
+      <div class="row" style="margin-top:10px;gap:6px">
+        <input type="text" class="ctl" id="commsCustom" placeholder="direct stream URL, e.g. …-128-mp3" aria-label="A custom audio stream URL" aria-describedby="commsCustomHint" spellcheck="false" autocomplete="off" inputmode="url" style="flex:1;min-width:0;font-size:11.5px;padding:6px 9px" />
+        <button class="btn" id="commsCustomGo" aria-label="Play the custom stream URL">use</button>
+      </div>
+      <div id="commsCustomHint" style="font-size:10.5px;color:var(--text-3);margin-top:6px;line-height:1.5">Needs a URL that <b>is</b> the audio (ends in <span class="mono">.mp3</span> / <span class="mono">.m4a</span> / <span class="mono">.ogg</span> / <span class="mono">.m3u8</span>, or a radio endpoint). Spotify and Twitch share links return a web page and cannot be played here.</div>
+      <div class="row" style="margin-top:9px"><button class="btn" id="commsStop" style="width:100%">stop</button></div>
+      <div class="cm-err" id="commsErr" role="status" hidden></div>
+      <div class="note">These are real public radio streams (SomaFM's space-themed channels, free and listener-supported) — not synthesised. <b>Live ISS air-to-ground chatter is not carried on any free public stream</b>. Paste your own URL if you have a feed.</div>
+    </div>
+  </div>
+  <button id="alertToggle" title="Audio alerts — a synthesised chime on X-class flares and high-severity events (key: a)" aria-label="Toggle audio alerts for severe space weather and disaster events" aria-pressed="false">🔔</button>
+  <!-- The one place to report bugs: the in-console bug dialog is gone from this build, so this
+       topbar link is the reporting channel as well as the community. -->
+  <a id="discordToggle" href="https://discord.gg/YFmDNEpQFQ" target="_blank" rel="noopener noreferrer" title="Our community — join for updates and to report bugs" aria-label="Join the Vantage community on Discord — the place to report bugs and get updates (opens in a new tab)"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/></svg></a>
+  <button id="themeToggle" title="Toggle light / dark mode" aria-label="Toggle light or dark theme">☾</button>
+</div>
+
+<main id="main">
+
+  <div id="rl-banner" role="status">
+    <span class="rl-ico">⏳</span>
+    <span><b>NASA API rate limit reached.</b> <span id="rl-source"></span> Showing built-in <b>sample data</b> so the console stays usable — add your own free api.nasa.gov key for live feeds.</span>
+    <button class="btn" id="rl-key-btn">Add API key</button>
+    <button class="rl-x" id="rl-close" title="Dismiss" aria-label="Dismiss rate limit notice">✕</button>
+  </div>
+
+  <div id="net-banner" role="status">
+    <span class="rl-ico">📡</span>
+    <span><b>You're offline.</b> Live feeds are paused — the console reconnects automatically and refreshes every section when the network returns.</span>
+  </div>
+
+  <!-- the 24-hour timeline is the Next 24 Hours page, further down this view list — it is a
+       deep-dive, deliberately not an above-every-view strip the reader has to scroll past -->
+
+  <!-- ============ OVERVIEW ============ -->
+  <section class="view active" id="view-overview">
+    <div class="view-head">
+      <h2>Overview</h2>
+      <p>One screen for everything moving right now: the station overhead, the near-term launch manifest, close-approaching asteroids and the latest rover contact.</p>
+    </div>
+
+    <div class="tiles">
+      <div class="tile"><div class="t-label">ISS altitude</div><div class="t-value" id="tile-iss-alt">—<span class="t-sub" style="display:inline"> km</span></div><div class="t-sub" id="tile-iss-sub">acquiring…</div></div>
+      <div class="tile c2"><div class="t-label">Launches in range</div><div class="t-value" id="tile-launch-count">—</div><div class="t-sub" id="tile-launch-sub">loading manifest…</div></div>
+      <div class="tile c3"><div class="t-label">NEO approaches</div><div class="t-value" id="tile-neo-count">—</div><div class="t-sub" id="tile-neo-sub">loading feed…</div></div>
+      <div class="tile c4"><div class="t-label">Mars photos</div><div class="t-value" id="tile-mars-count">—</div><div class="t-sub" id="tile-mars-sub">querying rovers…</div></div>
+    </div>
+
+    <div class="card iss-primary">
+      <div class="card-head">
+        <h3>◎ Vantage Control <span class="iss-flag">primary live tracker</span></h3>
+        <span class="meta" id="iss-updated">updating…</span>
+        <button class="btn" id="iss-follow" style="margin-left:auto" title="Keep the map centred on the station as it orbits" aria-pressed="false">⊙ follow ISS</button>
+      </div>
+      <div class="card-body">
+
+        <div class="ctl-sub first">
+          <div class="ctl-sub-head">
+            <h4>◉ Ground track</h4>
+            <span class="meta">station telemetry · <span class="mono">wheretheiss.at</span></span>
+          </div>
+        <div class="iss-grid">
+          <div class="telemetry">
+            <div class="stat"><div class="label">Latitude</div><div class="value" id="iss-lat">—</div></div>
+            <div class="stat"><div class="label">Longitude</div><div class="value" id="iss-lon">—</div></div>
+            <div class="stat"><div class="label">Altitude</div><div class="value" id="iss-alt">—<span class="unit">km</span></div></div>
+            <div class="stat"><div class="label">Velocity</div><div class="value" id="iss-vel">—<span class="unit">km/h</span></div></div>
+            <div class="stat"><div class="label">Orbit period</div><div class="value" id="iss-period">—<span class="unit">min</span></div></div>
+            <div class="stat"><div class="label">Orbits / day</div><div class="value" id="iss-orbits">—</div></div>
+            <div class="status-line" id="iss-status">Connecting to Where The ISS At…</div>
+            <div class="status-line" id="iss-where">Ground track: locating…</div>
+          </div>
+          <div class="map-wrap">
+            <div id="map" role="application" aria-label="World map showing the live position of the International Space Station and its ground track"></div>
+            <div class="map-badge" id="iss-follow-badge">◉ following ISS</div>
+          </div>
+        </div>
+        </div>
+
+        <!-- The one live video this console embeds. It sits under the ground track, where
+             you look after watching the dot move, and it loads only when asked. -->
+        <div class="ctl-sub">
+          <div class="ctl-sub-head">
+            <h4>🎥 Live from the station</h4>
+            <span class="meta" id="iss-feed-meta">NASA's official ISS stream · muted by default</span>
+          </div>
+          <div class="live-panel">
+            <div class="live-stage" id="iss-feed-stage">
+              <button class="live-play" id="iss-feed-play" aria-label="Start the live video from the International Space Station">▶</button>
+              <span class="live-hint">live video from the orbiting station — plays here, loaded when you press play</span>
+            </div>
+          </div>
+          <div class="live-foot">
+            <span class="live-chip off" id="iss-feed-chip">not loaded</span>
+            <span class="live-src">NASA · <span class="mono">youtube.com/watch?v=M3HKLzjvKPc</span></span>
+            <a class="btn" href="https://www.youtube.com/watch?v=M3HKLzjvKPc" target="_blank" rel="noopener noreferrer">open on YouTube ↗</a>
+            <button class="btn" id="iss-feed-stop">stop</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="section-gap"></div>
+
+    <div class="card">
+      <div class="card-head">
+        <h3>🛰 ISS pass predictor</h3>
+        <span class="meta" id="pass-meta">next visible overhead passes</span>
+        <button class="btn" id="pass-geo" style="margin-left:auto" aria-label="Use my device location to predict ISS passes">📍 use my location</button>
+        <div class="tip-wrap">
+          <button class="tip-btn" id="pass-help" aria-expanded="false" aria-controls="pass-help-pop" aria-label="How pass prediction works">?</button>
+          <div class="tip-pop" id="pass-help-pop" role="dialog" aria-label="How pass prediction works">
+            <h6>How these passes are worked out</h6>
+            <ol>
+              <li><b>TLE propagation.</b> The station's orbital elements come from live <span class="mono">Celestrak</span> two-line element sets, propagated forward with <span class="mono">Skyfield</span> (SGP4) to predict exactly where ISS will be — no orbit model is maintained in this page.</li>
+              <li><b>Your latitude &amp; longitude</b> fix the observer point. A pass begins when the station rises more than <span class="mono">10°</span> above your local horizon, peaks at <b>max elevation</b>, and sets again a few minutes later. Press <b>📍 use my location</b> or type coordinates.</li>
+              <li><b>Solar illumination</b> decides whether you could actually see it: ISS is only visible when it is <b>sunlit</b> while <i>your</i> sky is dark. The sun angle at the station and at the observer are compared per pass, so an overhead pass at noon is correctly labelled a <b>daylight pass</b> and hidden by <b>visible only</b>.</li>
+            </ol>
+            <div class="tip-foot">Times are UTC. A 10° pass lasts only a few minutes, so stand outside a couple of minutes early. Prediction is refreshed live and cached for 30 minutes per location.</div>
+          </div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="ctl-row">
+          <span class="gf-label">LAT</span>
+          <input type="number" class="ctl" id="pass-lat" step="0.0001" min="-90" max="90" value="38.8521" aria-label="Observer latitude in decimal degrees" title="Observer latitude, -90 to 90" />
+          <span class="gf-label">LON</span>
+          <input type="number" class="ctl" id="pass-lon" step="0.0001" min="-180" max="180" value="-77.0419" aria-label="Observer longitude in decimal degrees" title="Observer longitude, -180 to 180" />
+          <button class="btn primary" id="pass-go">predict passes</button>
+          <button class="btn" id="pass-visible" aria-pressed="false" title="Only show passes where the station is sunlit against a dark sky">visible only: off</button>
+          <span class="loading" id="pass-note">ready — press predict</span>
+        </div>
+        <div class="pass-list" id="pass-list">
+          <div class="empty">Type a location above, or press “use my location”, to see when the station next rides overhead.</div>
+        </div>
+        <div class="aurora-note">Passes are propagated by <b>Skyfield</b> against live Celestrak TLEs and served by the key-less public passes API, so nothing here needs a NASA key. Times are UTC — the 10° horizon pass lasts a few minutes, and only <b>visible</b> passes are worth stepping outside for, since the station must be sunlit while your own sky is dark.</div>
+      </div>
+    </div>
+
+    <div class="section-gap"></div>
+
+    <div class="grid cols-2">
+      <div class="card">
+        <div class="card-head"><h3>🚀 Next launch</h3><span class="meta">Launch Library 2</span></div>
+        <div class="card-body" id="next-launch-card"><span class="loading">fetching manifest…</span></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>☄ Biggest approach in range</h3><span class="meta">NeoWs feed</span></div>
+        <div class="card-body" id="top-neo-card"><span class="loading">fetching asteroid feed…</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SKY & EARTH ============ -->
+  <section class="view" id="view-sky">
+    <div class="view-head">
+      <h2>Sky &amp; Earth</h2>
+      <p>NASA's astronomy picture of the day, full-disc imagery of Earth from the DSCOVR EPIC camera, and your bookmarked images.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h3>✦ Astronomy picture of the day</h3>
+        <span class="meta">NASA APOD</span>
+      </div>
+      <div class="apod-card">
+        <div class="apod-media" id="apod-media"><span class="loading">fetching image…</span></div>
+        <div class="apod-body">
+          <div class="ctl-row" style="margin-bottom:6px">
+            <button class="btn icon" id="apod-prev" title="Previous day" aria-label="Show previous day's picture">←</button>
+            <input type="date" id="apod-date" />
+            <button class="btn icon" id="apod-next" title="Next day" aria-label="Show next day's picture">→</button>
+            <button class="btn" id="apod-random">random</button>
+            <button class="btn" id="bookmarkBtn">☆ bookmark</button>
+          </div>
+          <div class="apod-date" id="apod-date-label">—</div>
+          <h3 id="apod-title">Loading…</h3>
+          <p id="apod-explanation"></p>
+          <div class="credit" id="apod-credit"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-gap"></div>
+
+    <div class="card">
+      <div class="card-head">
+        <h3>🌐 Earth from DSCOVR · EPIC</h3>
+        <span class="meta" id="epic-meta">full disc · natural color</span>
+      </div>
+      <div class="card-body">
+        <div class="ctl-row">
+          <input type="date" class="ctl" id="epic-date" title="EPIC archive date (images exist since mid-2015)" />
+          <button class="btn" id="epic-load">load date</button>
+          <span class="loading" id="epic-note">showing the most recent available day…</span>
+        </div>
+        <div class="epic-strip" id="epic-strip"><span class="loading">fetching EPIC imagery…</span></div>
+      </div>
+    </div>
+
+    <div class="section-gap"></div>
+
+    <div class="card">
+      <div class="card-head">
+        <h3>☆ Bookmarked images</h3>
+        <span class="meta" id="bm-count">0 saved</span>
+      </div>
+      <div class="card-body">
+        <div class="bm-grid" id="bm-grid"></div>
+        <div class="empty" id="bm-empty" style="display:none">No bookmarks yet — hit “☆ bookmark” on an APOD image to pin it here.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ MISSIONS ============ -->
+  <section class="view" id="view-missions">
+    <div class="view-head">
+      <h2>Missions</h2>
+      <p>Every upcoming launch inside the global date range, with search, status filters, and the distribution of providers and vehicles charted below.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h3>🚀 Upcoming launches</h3>
+        <span class="meta" id="launch-meta">The Space Devs · Launch Library 2</span>
+        <span style="display:flex;gap:6px;margin-left:auto">
+          <button class="btn icon" id="export-launches-csv" title="Download launches as CSV" aria-label="Export launches as CSV">⤓ CSV</button>
+          <button class="btn icon" id="export-launches-json" title="Download launches as JSON" aria-label="Export launches as JSON">⤓ JSON</button>
+        </span>
+      </div>
+      <div class="card-body">
+        <div class="ctl-row">
+          <input type="text" id="launch-search" placeholder="Search by rocket, mission, or agency" style="flex:1;min-width:200px" />
+          <select id="launch-status">
+            <option value="all">All statuses</option>
+            <option value="go">Go / on schedule</option>
+            <option value="tbd">TBD / to be confirmed</option>
+            <option value="hold">Hold</option>
+          </select>
+          <select id="launch-agency">
+            <option value="all">All providers</option>
+          </select>
+          <button class="btn" id="launch-sort">sort: soonest ↓</button>
+        </div>
+        <div class="rows" id="launch-list"><div class="empty loading">fetching manifest…</div></div>
+      </div>
+    </div>
+
+    <div class="section-gap"></div>
+
+    <div class="grid cols-2">
+      <div class="card">
+        <div class="card-head"><h3>📊 Launches by provider</h3><span class="meta">global range</span></div>
+        <div class="card-body"><div class="chart-box tall"><canvas id="chart-agency"></canvas></div></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>📊 Readiness mix</h3><span class="meta">go vs tbd vs hold</span></div>
+        <div class="card-body"><div class="chart-box tall"><canvas id="chart-status"></canvas></div></div>
+      </div>
+    </div>
+
+    <div class="section-gap"></div>
+
+    <div class="card">
+      <div class="card-head"><h3>📊 Cadence by day</h3><span class="meta">launches per day in range</span></div>
+      <div class="card-body"><div class="chart-box"><canvas id="chart-cadence"></canvas></div></div>
+    </div>
+
+    <!-- the jellyfish deep-dive is the Space Jellyfish page, which also carries the
+         launch-by-launch sighting outlook — this card is the way in from Missions -->
+    <div class="section-gap"></div>
+
+    <div class="card">
+      <div class="card-head">
+        <h3>🌊 Space jellyfish</h3>
+        <span class="meta">the twilight plume phenomenon · a page in its own right</span>
+        <button class="btn primary" data-jf-open="1" style="margin-left:auto">open the jellyfish page</button>
+      </div>
+      <div class="card-body">
+        <p style="margin:0;font-size:12.5px;color:var(--text-2);line-height:1.68">A rocket's exhaust plume lit from below the horizon — a lighting condition, not a vehicle, and the same launch shows nothing at all a few hours either side of the window. The phenomenon, each launch's twilight window, and <b>which places on the ground could actually see it</b> sit on the <b>Space Jellyfish</b> page, which is a predictor: search any city, type coordinates, or stand at one of the pads on the manifest, and it works out the distance, the direction to look and how high the plume would ride over your horizon. Open it from the nav, from the button here, or with <b>j</b>.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ ASTEROIDS ============ -->
+  <section class="view" id="view-asteroids">
+    <div class="view-head">
+      <h2>Asteroids</h2>
+      <p>Near-Earth objects making close approaches inside the global range, from NASA's NeoWs feed. Click any column header to sort; sizes are estimated diameters.</p>
+    </div>
+
+    <div class="tiles" style="grid-template-columns:repeat(4,1fr)">
+      <div class="tile"><div class="t-label">Objects in range</div><div class="t-value" id="neo-k-count">—</div><div class="t-sub">approaches tracked</div></div>
+      <div class="tile c2"><div class="t-label">Potentially hazardous</div><div class="t-value" id="neo-k-hazard">—</div><div class="t-sub">NASA-flagged PHAs</div></div>
+      <div class="tile c3"><div class="t-label">Closest pass</div><div class="t-value" id="neo-k-closest">—</div><div class="t-sub" id="neo-k-closest-name">—</div></div>
+      <div class="tile c4"><div class="t-label">Largest estimated</div><div class="t-value" id="neo-k-largest">—</div><div class="t-sub" id="neo-k-largest-name">—</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h3>☄ Close approach feed</h3>
+        <span class="meta" id="neo-meta">NeoWs · 7-day feed window</span>
+        <span style="display:flex;gap:6px;margin-left:auto">
+          <button class="btn icon" id="export-neo-csv" title="Download asteroids as CSV" aria-label="Export asteroids as CSV">⤓ CSV</button>
+          <button class="btn icon" id="export-neo-json" title="Download asteroids as JSON" aria-label="Export asteroids as JSON">⤓ JSON</button>
+        </span>
+      </div>
+      <div class="card-body">
+        <div class="ctl-row">
+          <input type="text" id="neo-search" placeholder="Filter by designation…" style="flex:1;min-width:180px" />
+          <label style="display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--text-2);cursor:pointer">
+            <input type="checkbox" id="neo-hazard-only" style="accent-color:var(--accent)" /> hazardous only
+          </label>
+        </div>
+        <div class="neo-scroll">
+          <table class="neo">
+            <thead><tr>
+              <th data-sort="name" data-label="Object">Object</th>
+              <th data-sort="date" data-label="Close approach">Close approach</th>
+              <th data-sort="miss" data-label="Miss distance (lunar)">Miss distance (lunar) ↑</th>
+              <th data-sort="vel" data-label="Velocity (km/s)">Velocity (km/s)</th>
+              <th data-sort="diam" data-label="Est. diameter (m)">Est. diameter (m)</th>
+              <th data-sort="mag" data-label="Brightness (H)">Brightness (H)</th>
+            </tr></thead>
+            <tbody id="neo-body"><tr><td colspan="6" class="loading" style="padding:30px">fetching feed…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-gap"></div>
+
+    <div class="grid cols-2">
+      <div class="card">
+        <div class="card-head"><h3>📊 Miss distance distribution</h3><span class="meta">lunar distances</span></div>
+        <div class="card-body"><div class="chart-box"><canvas id="chart-neo-miss"></canvas></div></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>📊 Size classes</h3><span class="meta">estimated diameter</span></div>
+        <div class="card-body"><div class="chart-box"><canvas id="chart-neo-size"></canvas></div></div>
+      </div>
+    </div>
+
+    <!-- ============ ASTEROIDS DEEP DIVE ============ -->
+    <div class="section-gap"></div>
+
+    <div class="card">
+      <div class="card-head">
+        <h3>📚 Deep dive · why anyone tracks these</h3>
+        <span class="meta">planetary defense in one screen</span>
+      </div>
+      <div class="card-body dd">
+        <div class="dd-grid">
+          <div>
+            <p>A near-Earth object is the only natural hazard humanity has ever been able to <b>do something about in advance</b>. Earthquakes, hurricanes and volcanoes arrive on their own schedule; an asteroid keeps an appointment that can be read decades ahead. That asymmetry is the whole reason the tracking exists — not curiosity about rocks, but the fact that a collision is, uniquely, <b>avoidable</b> if it is found early enough.</p>
+            <p>The 2022 DART mission closed the loop: a spacecraft was flown into the moonlet Dimorphos and measurably shortened its orbit around Didymos. Deflection moved from theory to demonstrated engineering. What DART did not demonstrate is the hard part — <b>you need years of warning to nudge something far enough</b>. A kinetic impactor changes a trajectory by roughly the width of the object itself; the miss distance accumulates only with time.</p>
+            <p>So the bottleneck is the <b>catalogue</b>, not the rocket. Congress asked NASA in 1998 to find 90% of the objects 1 km and larger; that population is now essentially accounted for. The current goal — 140 m and up — is not close to complete, and Chelyabinsk in 2013 is the reason that matters: a ~20 m object, arriving with no warning at all, airburst with about 30 times the energy of the Hiroshima bomb and injured roughly 1,500 people through shattered glass. Objects that size sit below most survey detection thresholds, and they do not need to reach the ground to cause harm.</p>
+          </div>
+          <div>
+            <p>Two numbers decide whether a newly found object deserves attention, and neither is <i>size</i>:</p>
+            <ul>
+              <li><b>How close it can come.</b> The orbit is computed forward for centuries and squashed into a single figure — the <b>MOID</b>, the minimum orbit intersection distance. If that never gets small, no amount of mass makes an object dangerous.</li>
+              <li><b>How uncertain the orbit is.</b> A brand-new object has an arc of a few days, and the resulting probability cone is enormous. Most PHA designations are withdrawn within weeks as the arc lengthens. The 2004 object <b>Apophis</b> climbed to level 4 on the Torino Scale — the highest score any object has reached — before a precovery image from 2004 settled its orbit and ruled out the 2029 impact entirely.</li>
+            </ul>
+            <p>That pattern — alarm, then resolution — is the normal outcome, and it is a sign the system works rather than a sign of false alarm. A tracking programme that never changes its mind is one that is not looking hard enough.</p>
+            <p class="dd-note">The table on this page is <b>not</b> a risk assessment. It is a list of objects passing reasonably close; the largest is usually a few hundred metres with a zero percent chance of impact for the next century. NASA's impact-risk analysis lives at the Center for Near-Earth Object Studies, and a PHA flag there means "worth watching", never "incoming".</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-gap"></div>
+
+    <div class="card">
+      <div class="card-head"><h3>🔤 The vocabulary</h3><span class="meta">what the words actually mean</span></div>
+      <div class="card-body">
+        <div class="dd-terms">
+          <div class="dd-term"><div class="t">Asteroid</div><div class="d">A rocky or metallic body orbiting the Sun, smaller than a planet and larger than about a metre, left over from the solar system's formation. Most live in the main belt between Mars and Jupiter and will never come near us.</div></div>
+          <div class="dd-term"><div class="t">NEO<br><span style="font-weight:400;color:var(--text-3);font-size:11px">near-Earth object</span></div><div class="d">Any asteroid or comet whose orbit brings it within about <b>1.3 AU</b> of the Sun — close enough that it can, over millennia, reach Earth's neighbourhood. Roughly 35,000 are known, and the count rises weekly. "Near" is astronomical: most never come closer than the Moon.</div></div>
+          <div class="dd-term"><div class="t">PHA<br><span style="font-weight:400;color:var(--text-3);font-size:11px">potentially hazardous asteroid</span></div><div class="d">A formal, mechanical definition, not a judgement call: the orbit must come within <b>0.05 AU</b> (about 19.5 lunar distances) of Earth <i>and</i> the object must be <b>H ≤ 22</b>, which corresponds to roughly 140 m across. Both conditions are required. About 5% of NEOs qualify, which means a PHA is a common, unremarkable classification.</div></div>
+          <div class="dd-term"><div class="t">Meteoroid</div><div class="d">A much smaller body in space — the IAU draws no sharp boundary, and in practice the term covers fragments from about 30 µm up to a metre. Below that it is interplanetary dust; above it, an asteroid.</div></div>
+          <div class="dd-term"><div class="t">Meteor</div><div class="d">The <b>light</b>, not the object. The streak is a trail of ionised air around something burning up at 70–100 km altitude. A meteor is an event, not a rock.</div></div>
+          <div class="dd-term"><div class="t">Meteorite</div><div class="d">Whatever reaches the ground. Most metre-scale objects break apart in the atmosphere and never produce one.</div></div>
+          <div class="dd-term"><div class="t">Bolide</div><div class="d">A meteor bright enough to explode, usually fragmenting in the air. Chelyabinsk was a bolide; seismic and infrasound stations detected it worldwide though no meteorite of significant size was recovered.</div></div>
+          <div class="dd-term"><div class="t">AU</div><div class="d">Astronomical unit — the mean Earth–Sun distance, about <b>149.6 million km</b>. The unit every distance on this page is measured in.</div></div>
+          <div class="dd-term"><div class="t">Lunar distance</div><div class="d">Distance to the Moon, about <b>384,400 km</b>. The asteroid table uses it because it makes "how close is close" legible: 1 LD is the Moon's orbit, 20 LD is a comfortable miss.</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-gap"></div>
+
+    <div class="grid cols-2">
+      <div class="card">
+        <div class="card-head"><h3>⚠ The Torino Scale</h3><span class="meta">0–10 · impact hazard</span></div>
+        <div class="card-body dd">
+          <p>Designed for <b>communicating with the public</b>: a single integer, 0 to 10, combining the probability of impact with the kinetic energy of the object. Colour-coded so a glance carries the meaning. It is deliberately conservative — anything with a nonzero but tiny probability lands at 0.</p>
+          <div class="dd-scroll">
+            <table class="dd-table">
+              <thead><tr><th>Level</th><th>Meaning</th></tr></thead>
+              <tbody>
+                <tr><td class="k">0</td><td><b>No hazard.</b> Either the chance is zero, or so close to it that it falls below the background rate of random impacts.</td></tr>
+                <tr><td class="k">1</td><td><b>Normal.</b> A routine discovery that will almost certainly be downgraded to 0 as the orbit is refined. No public concern.</td></tr>
+                <tr><td class="k">2</td><td><b>Merits attention by astronomers</b> — a close but not unusual encounter. Still not a public concern.</td></tr>
+                <tr><td class="k">3 · 4</td><td><b>Close encounter, merits attention.</b> At 3 the chance of <i>localised</i> destruction exceeds 1%; at 4 it is global. Alerting the public is warranted at 4.</td></tr>
+                <tr><td class="k">5 · 6 · 7</td><td><b>Threatening.</b> A significant chance of regional destruction at 5–6, or unprecedented at 7. These levels are reserved for a real, unresolved threat.</td></tr>
+                <tr><td class="k">8 · 9 · 10</td><td><b>Certain collision.</b> 8 causes localised, 9 regional and 10 global destruction on impact. Empty for the entire history of the scale.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="dd-note"><b>Apophis holds the record at level 4</b>, reached in December 2004 and withdrawn days later once archival observations pinned its orbit. Asteroids currently on the Sentry risk list sit at 0.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h3>📐 The Palermo Scale</h3><span class="meta">logarithmic · technical</span></div>
+        <div class="card-body dd">
+          <p>Where Torino is for the public, Palermo is for the people doing the work. It asks a sharper question than "how likely is an impact": <b>how much more likely is this object to hit us than the background rate of objects its size?</b></p>
+          <p>The value is the logarithm of the ratio of the object's impact risk to the average risk from the whole population of similar objects over the same period. Being logarithmic, the numbers are small but steep:</p>
+          <div class="dd-scroll">
+            <table class="dd-table">
+              <thead><tr><th>Value</th><th>Reading</th></tr></thead>
+              <tbody>
+                <tr><td class="k">below −2</td><td><b>No cause for concern.</b> The object is less threatening than the everyday background. Almost everything ever discovered sits here.</td></tr>
+                <tr><td class="k">−2 to 0</td><td><b>Merits careful monitoring.</b> Between 100× and 1× the background risk. Worth follow-up observation, not alarm.</td></tr>
+                <tr><td class="k">0 to +2</td><td><b>Concerning.</b> Up to 100× the background rate. This range has been reached only a handful of times.</td></tr>
+                <tr><td class="k">above +2</td><td><b>Threat.</b> More than 100× background. No object has ever scored here.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>Because it is a continuous scale, Palermo can separate two objects that both read "Torino 1" but differ by orders of magnitude in actual risk — which is exactly the resolution a survey programme needs and a colour code cannot give.</p>
+          <p class="dd-note">Both scales share one property worth holding onto: <b>they change</b>. A score is a statement about the current orbit fit, not about the object. Better data revises it, and nearly always downward.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-gap"></div>
+
+    <div class="card">
+      <div class="card-head"><h3>🪨 Asteroid classes</h3><span class="meta">C · S · M and the rest</span></div>
+      <div class="card-body dd">
+        <p>Class is inferred from <b>colour and albedo</b> — how much sunlight the surface reflects and at which wavelengths — because almost no NEO is resolved as more than a point of light. The classes map closely onto composition, and composition decides both what a body is worth mining and how hard it is to see.</p>
+        <div class="dd-scroll">
+          <table class="dd-table">
+            <thead><tr><th>Type</th><th>Share</th><th>Make-up and behaviour</th></tr></thead>
+            <tbody>
+              <tr><td class="k">C · carbonaceous</td><td>~75%</td><td>The most common asteroid type, and the darkest — albedo around <b>0.03–0.09</b>, reflecting almost nothing. Carbon-rich, chemically primitive, water-bearing clay minerals. Essentially unaltered since the solar system formed, which is why they are prime targets for sample return — Ryugu (Hayabusa2) and Bennu (OSIRIS-REx) are both carbonaceous.</td></tr>
+              <tr><td class="k">S · silicaceous</td><td>~17%</td><td>Stony, moderate albedo (<b>0.10–0.22</b>). Silicates mixed with iron and nickel, altered by heat and water early on. Their meteorites — ordinary chondrites — are the most common type found on Earth, which is a selection effect: S-types dominate the inner belt, close to the resonances that fling material inward.</td></tr>
+              <tr><td class="k">M · metallic</td><td>~8%<span style="color:var(--text-3);font-size:11px"> of belt</span></td><td>Nickel–iron, relatively bright (<b>0.10–0.20</b>). Thought to be the exposed cores of differentiated bodies shattered by collisions. The source of iron meteorites, and the reason <b>16 Psyche</b> is being visited — a metal core that can be studied without digging a planet open.</td></tr>
+              <tr><td class="k">V · vestoid</td><td>small</td><td>Basaltic rock from the crust of <b>4 Vesta</b>, stripped off by an ancient impact. The HED meteorites come from here.</td></tr>
+              <tr><td class="k">P / D</td><td>outer</td><td>Very dark and reddish, concentrated in the outer belt and among Jupiter's Trojans. Probably ice-rich and organic; the most likely parent material of comets.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="dd-note">There is a real consequence hiding in that albedo spread, and it applies to the table above. A C-type reflects a tenth of what an S-type does, so at the same size it appears <b>much</b> fainter — and a faint object is found later, tracked less precisely, and easier to miss entirely. Dark asteroids are both the most common and the hardest to catalogue.</p>
+      </div>
+    </div>
+
+    <div class="section-gap"></div>
+
+    <div class="card">
+      <div class="card-head"><h3>🔬 How the numbers above are actually derived</h3><span class="meta">an estimate, not a measurement</span></div>
+      <div class="card-body dd">
+        <div class="dd-grid">
+          <div>
+            <p><b>Diameter.</b> Almost no object passing Earth is large enough to resolve as a disk, even for Hubble. NASA publishes an <i>estimated</i> diameter computed from the object's absolute magnitude <b>H</b> — how bright it would look 1 AU from the Sun and 1 AU from Earth — combined with an <b>assumed albedo</b>. The range shown in the table is that assumption expressed as a bracket, and it is wide on purpose.</p>
+            <p>This means the column is an inference dressed as a number. A 100 m carbonaceous asteroid with a dark surface and a 100 m silicaceous one with a bright surface do not look alike from Earth, and the estimate resolves the ambiguity by guessing. Anything known only from a short arc of observation can be off by a factor of two or more.</p>
+          </div>
+          <div>
+            <p><b>Close approach and velocity.</b> Both are relative to Earth at the moment of the encounter, and the velocity is dominated by the geometry of the intersection rather than the object's own speed around the Sun. Two asteroids on similar orbits can differ by tens of km/s purely because one meets Earth head-on and the other catches up from behind — which is also why the second kind is far easier to launch a mission to.</p>
+            <p><b>Brightness (H).</b> Smaller H means brighter. Counter-intuitively, a <i>low</i> H means a <i>larger</i> object, because it reflects more light. H is the input to the size estimate, which is why the two columns move together rather than independently.</p>
+            <p class="dd-note">Read the diameter column as an order of magnitude, not a figure. It is the single most-flagged estimate on this page, and the API says so itself by returning a range.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ MARS ============ -->
+  <section class="view" id="view-mars">
+    <div class="view-head">
+      <h2>Mars</h2>
+      <p>Raw imagery straight from the Curiosity and Perseverance rovers. Pick a rover, choose a sol (Mars solar day) or Earth date, and browse what the cameras saw.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h3>◍ Rover photo browser</h3>
+        <span class="meta">NASA Mars Rover Photos API</span>
+      </div>
+      <div class="card-body">
+        <div class="ctl-row">
+          <div class="rover-tabs" id="roverTabs">
+            <button class="rover-tab active" data-rover="Curiosity">Curiosity</button>
+            <button class="rover-tab" data-rover="Perseverance">Perseverance</button>
+          </div>
+        </div>
+        <div class="ctl-row">
+          <select class="ctl" id="mars-mode">
+            <option value="sol">by sol (Mars day)</option>
+            <option value="earth">by Earth date</option>
+          </select>
+          <input type="number" class="ctl" id="mars-sol" min="0" max="999999" step="1" value="1000" style="width:110px" title="Mars solar day number (0 – rover's latest sol)" aria-label="Mars solar day number" />
+          <input type="date" class="ctl" id="mars-earth" min="2004-01-25" max="2026-12-31" style="display:none" aria-label="Earth date for rover photos" />
+          <select class="ctl" id="mars-camera"><option value="">all cameras</option></select>
+          <button class="btn primary" id="mars-load">fetch photos</button>
+          <span class="loading" id="mars-note"></span>
+        </div>
+        <div class="rover-stats" id="rover-stats"></div>
+        <div class="section-gap" style="height:16px"></div>
+        <div class="mars-grid" id="mars-grid"><span class="loading">choose a sol and press “fetch photos”…</span></div>
+      </div>
+    </div>
+
+    <div class="section-gap"></div>
+
+    <div class="grid cols-2">
+      <div class="card">
+        <div class="card-head"><h3>📊 Photos by camera</h3><span class="meta">current query</span></div>
+        <div class="card-body"><div class="chart-box"><canvas id="chart-mars-cam"></canvas></div></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>◍ Latest contact</h3><span class="meta">most recent sol with imagery</span></div>
+        <div class="card-body" id="mars-latest"><span class="loading">checking rover status…</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SPACE WEATHER ============ -->
+  <section class="view" id="view-weather">
+    <div class="view-head">
+      <h2>Space Weather</h2>
+      <p>Heliophysics from NASA's DONKI database: solar flares, coronal mass ejections and geomagnetic storms, plus a disk map that shows where each flare actually broke out. Earth-side hazards — wildfires, storms, volcanoes and the rest — have their own section under <b>Natural Events</b>.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h3>🛰 Real-time space weather · NOAA SWPC</h3>
+        <span class="meta" id="swpc-meta">NOAA Space Weather Prediction Center · updates every few minutes</span>
+        <button class="btn icon" id="swpc-reload" style="margin-left:auto" title="Re-query every SWPC product" aria-label="Reload the NOAA space weather products">↻ reload</button>
+      </div>
+      <div class="card-body">
+        <div id="swpc-notice" role="status" hidden></div>
+        <div class="swpc-tiles">
+          <div class="swpc-kv" id="swpc-kp-box"><div class="k">Kp index · now</div><div class="v" id="swpc-kp">—</div><div class="s" id="swpc-kp-sub">querying SWPC…</div></div>
+          <div class="swpc-kv g2"><div class="k">Solar wind</div><div class="v" id="swpc-wind">—<span class="u">km/s</span></div><div class="s" id="swpc-wind-sub">—</div></div>
+          <div class="swpc-kv g3"><div class="k">IMF Bz · GSM</div><div class="v" id="swpc-bz">—<span class="u">nT</span></div><div class="s" id="swpc-bz-sub">—</div></div>
+          <div class="swpc-kv g5"><div class="k">F10.7 flux</div><div class="v" id="swpc-flux">—<span class="u">sfu</span></div><div class="s" id="swpc-flux-sub">—</div></div>
+          <div class="swpc-kv g4"><div class="k">X-ray · now</div><div class="v" id="swpc-xray">—</div><div class="s" id="swpc-xray-sub">—</div></div>
+        </div>
+        <div class="swpc-grid">
+          <div>
+            <h5 class="mm-h">Kp · last 24 hours</h5>
+            <div class="chart-box"><canvas id="chart-kp"></canvas></div>
+          </div>
+          <div>
+            <h5 class="mm-h">3-day Kp forecast</h5>
+            <div class="kp-list" id="kp-forecast"><div class="empty loading">fetching forecast…</div></div>
+            <div class="mm-note" id="swpc-note">Kp is the planetary geomagnetic index: 0–4 is quiet, 5 a minor storm (G1), 7+ a strong one (G3+) and the point at which aurora is often visible from mid-latitudes.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-gap"></div>
+
+    <div class="tiles">
+      <div class="tile"><div class="t-label">Solar flares · 30d</div><div class="t-value" id="donki-k-flares">—</div><div class="t-sub" id="donki-k-flares-sub">loading…</div></div>
+      <div class="tile c2"><div class="t-label">Strongest flare</div><div class="t-value" id="donki-k-strongest">—</div><div class="t-sub" id="donki-k-strongest-sub">—</div></div>
+      <div class="tile c3"><div class="t-label">Geomagnetic storms</div><div class="t-value" id="donki-k-gst">—</div><div class="t-sub" id="donki-k-gst-sub">—</div></div>
+      <div class="tile c4"><div class="t-label">CME events</div><div class="t-value" id="donki-k-cme">—</div><div class="t-sub" id="donki-k-cme-sub">—</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h3>☀ Solar activity feed</h3>
+        <span class="meta" id="donki-meta">DONKI · 30-day window</span>
+        <span style="display:flex;gap:6px;margin-left:auto">
+          <button class="btn icon" id="export-donki-csv" title="Download space weather events as CSV" aria-label="Export space weather events as CSV">⤓ CSV</button>
+          <button class="btn icon" id="export-donki-json" title="Download space weather events as JSON" aria-label="Export space weather events as JSON">⤓ JSON</button>
+        </span>
+      </div>
+      <div class="card-body">
+        <div class="ctl-row">
+          <select class="ctl" id="donki-filter" title="Filter the solar activity feed by event type">
+            <option value="all">All event types</option>
+            <option value="FLR">Solar flares</option>
+            <option value="CME">Coronal mass ejections</option>
+            <option value="GST">Geomagnetic storms</option>
+          </select>
+          <button class="btn" id="donki-reload">reload window</button>
+          <span class="loading" id="donki-note">querying DONKI…</span>
+        </div>
+        <div class="sev-list" id="donki-list"><div class="empty loading">fetching solar activity…</div></div>
+      </div>
+    </div>
+
+    <div class="section-gap"></div>
+
+    <div class="card">
+      <div class="card-head">
+        <h3>☉ Solar flare locator</h3>
+        <span class="meta" id="sun-meta">DONKI source locations · rotated to now</span>
+        <span style="display:flex;gap:6px;margin-left:auto">
+          <button class="btn icon" id="sun-reset" title="Reset the solar view" aria-label="Reset the solar disk zoom">reset view</button>
+        </span>
+      </div>
+      <div class="card-body">
+        <div class="sun-grid">
+          <div>
+            <div class="sun-stage" id="sun-stage"><div class="sun-tip" id="sun-tip"></div></div>
+            <div class="sun-legend"><span>◀ EAST limb</span><span>central meridian · equator</span><span>WEST limb ▶</span></div>
+          </div>
+          <div>
+            <div class="ctl-row" style="margin-bottom:8px"><span class="loading" id="sun-note">building the disk…</span></div>
+            <div class="ar-list" id="sun-regions"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-gap"></div>
+
+    <div class="card">
+      <div class="card-head"><h3>📊 Flares by class</h3><span class="meta">GOES X-ray class, 30-day window</span></div>
+      <div class="card-body"><div class="chart-box"><canvas id="chart-donki"></canvas></div></div>
+    </div>
+
+    <!-- ============ SPACE WEATHER DEEP DIVE ============ -->
+    <div class="section-gap"></div>
+
+    <div class="card">
+      <div class="card-head">
+        <h3>📚 Deep dive · reading the Sun</h3>
+        <span class="meta">flares, CMEs, and what the numbers above mean</span>
+      </div>
+      <div class="card-body dd">
+        <div class="dd-grid">
+          <div>
+            <p>A <b>solar flare</b> is a sudden release of magnetic energy in the corona — the Sun's outer atmosphere — dumping energy into plasma and accelerating particles. What reaches Earth first is <b>radiation</b>, travelling at light speed, which is why a flare is felt about <b>eight minutes</b> after it happens. Nothing can be forecast to the minute; what is predictable is that a sunspot complex with tangled, opposite-polarity fields is more likely to produce one.</p>
+            <p>Flares are graded by the X-ray flux GOES measures in the <b>1–8 Å</b> band, in watts per square metre. The classes step by decades, so each letter is <b>ten times</b> the one before it, and the number subdivides that decade — an M5 is five tenths of the way from M1 to X1.</p>
+          </div>
+          <div>
+            <div class="dd-scroll">
+              <table class="dd-table">
+                <thead><tr><th>Class</th><th>Flux (W/m²)</th><th>What it typically does</th></tr></thead>
+                <tbody>
+                  <tr><td><span class="pill a">A</span> <span class="pill b">B</span></td><td class="k">&lt; 10⁻⁶</td><td>Background. Constant, unremarkable, no terrestrial effect.</td></tr>
+                  <tr><td><span class="pill c">C</span></td><td class="k">10⁻⁶ – 10⁻⁵</td><td>Small. Faint HF radio degradation on the sunlit side at high latitudes, usually unnoticed.</td></tr>
+                  <tr><td><span class="pill m">M</span></td><td class="k">10⁻⁵ – 10⁻⁴</td><td>Medium. Brief radio blackouts (minutes) on the sunlit side, polar HF absorption, and a good chance of an accompanying CME. <b>M-class is the everyday working level during solar maximum.</b></td></tr>
+                  <tr><td><span class="pill x">X</span></td><td class="k">≥ 10⁻⁴</td><td>Large. Wide, long HF blackouts; often a fast CME and a solar radiation storm behind it. The scale is open-ended — the 2003 Halloween events reached an estimated X45.</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p class="dd-note">The class alone does not tell you whether Earth is affected. A flare on the far limb, aimed away, is scientifically interesting and operationally irrelevant.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-gap"></div>
+
+    <div class="grid cols-2">
+      <div class="card">
+        <div class="card-head"><h3>🌪 Coronal mass ejections</h3><span class="meta">not the same thing as a flare</span></div>
+        <div class="card-body dd">
+          <p>This is the most common misunderstanding in space weather, and it matters. A flare is <i>radiation</i> — it arrives in eight minutes and is over. A <b>coronal mass ejection</b> is matter: on the order of a <b>billion tonnes</b> of magnetised plasma thrown off the corona, expanding at anywhere from <b>250 to 3,000 km/s</b>. Where a flare gives warning measured in minutes, a CME gives <b>15 hours to three days</b> — the difference between an event you can only observe and one you can prepare for.</p>
+          <p>The two are related but not paired. Many flares launch no CME; many CMEs come from filament eruptions that produce no flare at all. So a big X-class flare with nothing behind it is a much smaller event than the class suggests.</p>
+          <p>What decides whether a CME does anything at Earth is its <b>magnetic orientation</b>. Earth's field points north on the dayside facing the Sun. A CME whose own field points <b>south</b> couples to it — the two fields reconnect, opening the magnetosphere to the solar wind and pouring energy into the ring current and the auroral zones. A CME with a northward field largely slides past. That single component is what the <b>IMF Bz</b> tile above is reporting, and it is why a middling CME with the right orientation can outperform a monster with the wrong one.</p>
+          <p class="dd-note">Aurora follows a southward turning by roughly <b>30–60 minutes</b>, not instantly — the delay is the time for the magnetosphere to load and then release.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h3>📏 The NOAA scales</h3><span class="meta">G · R · S</span></div>
+        <div class="card-body dd">
+          <p>Three separate phenomena, three separate 1-to-5 scales. They are routinely conflated, and the <i>letter</i> rather than the number is what carries the meaning.</p>
+          <div class="dd-scroll">
+            <table class="dd-table">
+              <thead><tr><th>Scale</th><th>Driver</th><th>1 → 5</th></tr></thead>
+              <tbody>
+                <tr><td><span class="pill g">G</span> geomagnetic</td><td class="k">Kp</td><td><b>Storm:</b> G1 Kp 5 → G5 Kp 9. Grid voltage irregularities, satellite drag and orientation problems, degraded GNSS. <b>The scale that drives aurora.</b></td></tr>
+                <tr><td><span class="pill r">R</span> radio blackout</td><td class="k">X-ray</td><td><b>HF fade on the sunlit side:</b> R1 M1 → R5 X20+. Arrives with the flare, lasts minutes to hours, and is the fastest effect of any solar event.</td></tr>
+                <tr><td><span class="pill s">S</span> radiation storm</td><td class="k">protons</td><td><b>Energetic protons:</b> S1 → S5. Solar panels degrade, single-event upsets hit electronics, and polar flight crews face elevated dose — which is why some transpolar routes are rerouted during a strong S event.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>NOAA uses <b>geomagnetic latitude</b>, not the geographic latitude on a normal map, and the two differ substantially — in North America the magnetic pole pulls the auroral zone noticeably south of where longitude lines suggest. This is the single biggest reason people at "the wrong latitude" see aurora anyway, and people at "the right latitude" miss it.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-gap"></div>
+
+    <div class="card">
+      <div class="card-head"><h3>🟢 Auroras and the Kp index</h3><span class="meta">why the oval grows, and when you can see it</span></div>
+      <div class="card-body dd">
+        <div class="dd-grid">
+          <div>
+            <p><b>Kp is a 3-hour planetary index</b> running from 0 to 9, in thirds. It is not measured by a satellite — it is derived from magnetometer stations at mid-latitudes, each producing a local K index, which are then normalised and averaged. That is why it is <i>planetary</i> and why it is coarse: it compresses three hours and half the globe into one number. It is also quasi-logarithmic, so the jump from Kp 7 to Kp 8 is a much larger physical change than 3 to 4.</p>
+            <p>The <b>auroral oval</b> is permanent — a ring of glowing atmosphere around each magnetic pole, present every night of the year. What changes is its <i>size</i>. Solar wind energy entering the magnetosphere drives currents that expand the oval equatorward, and Kp is the accepted shorthand for how far it has come. A quiet Kp 2 keeps the oval over the Arctic; at Kp 9 its equatorward edge can reach the latitude of the Mediterranean.</p>
+          </div>
+          <div>
+            <div class="dd-scroll">
+              <table class="dd-table">
+                <thead><tr><th>Kp</th><th>Scale</th><th>Oval edge (geomagnetic)</th></tr></thead>
+                <tbody>
+                  <tr><td class="k">0 – 4</td><td>—</td><td>Quiet. Aurora confined to 65° + — northern Scandinavia, Alaska, northern Canada.</td></tr>
+                  <tr><td class="k">5</td><td><span class="pill g">G1</span></td><td>≈ 60°. Overhead in Iceland, northern Scotland, the Baltic.</td></tr>
+                  <tr><td class="k">6</td><td><span class="pill g">G2</span></td><td>≈ 55°. Visible on the horizon from northern England, the northern US border states.</td></tr>
+                  <tr><td class="k">7</td><td><span class="pill g">G3</span></td><td>≈ 50°. Overhead across the UK and northern Germany; on the horizon from Paris.</td></tr>
+                  <tr><td class="k">8</td><td><span class="pill g">G4</span></td><td>≈ 45°. The May 2024 G5 storm was seen from Mexico and the Mediterranean — a once-in-decades event.</td></tr>
+                  <tr><td class="k">9</td><td><span class="pill g">G5</span></td><td>≈ 40°. Aurora near the tropics; the 2003 Halloween storms turned the sky red over Florida.</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p class="dd-note"><b>Kp is not a visibility forecast.</b> A high Kp with the oval on the far side of the planet from you shows you nothing, and "on the horizon" aurora is a faint red glow easily lost to light pollution, moonlight or haze. Dark skies and a clear view toward the magnetic pole matter more than the number for most observers — which is why the OVATION overlay on the <b>Natural Events</b> map is the more useful guide: it plots where the oval actually is right now, rather than how large it might be.</p>
+          </div>
+        </div>
+        <p class="dd-note">The colour is altitude and chemistry, not temperature. Solar particles excite oxygen and nitrogen at different heights: green (557.7 nm) from atomic oxygen at 100–150 km, red (630 nm) from oxygen far higher at 200–400 km, and violet-blue fringes from molecular nitrogen. The most common aurora is green, and the red seen from low latitudes in a great storm is the high-altitude oxygen layer being lit up overhead.</p>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ============ NATURAL EVENTS ============ -->
+  <section class="view" id="view-events">
+    <div class="view-head">
+      <h2>Natural Events</h2>
+      <p>Every hazard NASA's EONET is currently tracking — wildfires, severe storms, volcanoes, floods, sea and lake ice — on its own map, deliberately separate from the station tracker. Narrow it by category or widen the window, then click any marker for its coordinates, date and source.</p>
+    </div>
+
+    <div class="tiles">
+      <div class="tile"><div class="t-label">Events in window</div><div class="t-value" id="eonet-k-count">—</div><div class="t-sub" id="eonet-k-count-sub">loading…</div></div>
+      <div class="tile c2"><div class="t-label">Categories active</div><div class="t-value" id="eonet-k-cats">—</div><div class="t-sub" id="eonet-k-cats-sub">—</div></div>
+      <div class="tile c3"><div class="t-label">Most active</div><div class="t-value" id="eonet-k-top">—</div><div class="t-sub" id="eonet-k-top-sub">—</div></div>
+      <div class="tile c4"><div class="t-label">Strongest reported</div><div class="t-value" id="eonet-k-max">—</div><div class="t-sub" id="eonet-k-max-sub">—</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h3>🗺 Natural events map · EONET</h3>
+        <span class="meta" id="events-meta">key-less feed · 30-day window</span>
+        <span style="display:flex;gap:6px;margin-left:auto">
+          <button class="btn icon" id="eonet-map-btn" title="Zoom the map to fit every visible event" aria-label="Zoom the map to fit every visible event">fit all ↗</button>
+        </span>
+      </div>
+      <div class="card-body">
+        <div id="eonet-notice" role="status" hidden></div>
+        <div class="ctl-row">
+          <span class="gf-label">WINDOW</span>
+          <select class="ctl" id="eonet-days" title="How far back to pull natural events">
+            <option value="7">Past 7 days</option>
+            <option value="30" selected>Past 30 days</option>
+            <option value="90">Past 90 days</option>
+          </select>
+          <button class="btn" id="eonet-all-cats">select all categories</button>
+          <button class="btn ev-chip aurora-chip" id="aurora-toggle" aria-pressed="false" aria-label="Overlay NOAA's 30-minute aurora forecast on this map" title="Overlay NOAA's 30-minute aurora forecast on this map"><span class="sw" style="background:#34D399"></span>aurora forecast</button>
+          <span class="loading" id="eonet-note">querying EONET…</span>
+        </div>
+        <div class="chip-row" id="eonet-cats"></div>
+        <div class="chip-row" id="storm-row">
+          <span class="gf-label">TROPICAL SYSTEMS</span>
+          <div class="storm-cats" id="storm-cats"></div>
+          <button class="btn" id="storm-paths" aria-pressed="true" title="Draw the NHC forecast cone and track as soon as a storm marker is clicked">forecast paths: on</button>
+          <span class="loading" id="storm-note">querying NHC…</span>
+        </div>
+        <div class="aurora-note" id="aurora-note" role="status" hidden></div>
+        <div class="map-wrap">
+          <div id="events-map" role="application" aria-label="World map of active natural events tracked by NASA EONET"></div>
+          <div class="map-legend" id="events-legend" style="display:none"></div>
+        </div>
+        <div class="stream-note">Hazards live here rather than on the Overview: the station tracker stays strictly telemetry, while every wildfire, storm and other event EONET reports is drawn on this map. Click a legend row to show or hide that category — the chips above do exactly the same thing.</div>
+      </div>
+    </div>
+
+    <div class="section-gap"></div>
+
+    <div class="grid cols-2">
+      <div class="card">
+        <div class="card-head">
+          <h3>🌍 Event feed · EONET</h3>
+          <span class="meta" id="eonet-meta">EONET · key-less feed · 30-day window</span>
+          <span style="display:flex;gap:6px;margin-left:auto">
+            <button class="btn icon" id="export-eonet-csv" title="Download natural events as CSV" aria-label="Export natural events as CSV">⤓ CSV</button>
+            <button class="btn icon" id="export-eonet-json" title="Download natural events as JSON" aria-label="Export natural events as JSON">⤓ JSON</button>
+          </span>
+        </div>
+        <div class="card-body">
+          <div class="sev-list" id="eonet-list"><div class="empty loading">fetching natural events…</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>📊 Events by category</h3><span class="meta">EONET · current window</span></div>
+        <div class="card-body"><div class="chart-box"><canvas id="chart-eonet"></canvas></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ ANALYSIS ============ -->
+  <section class="view" id="view-brief">
+    <div class="view-head">
+      <h2>Analysis</h2>
+      <p>Automated write-ups generated from the live feeds: orbital mechanics of the station, manifest reliability across providers, and the asteroid picture in range.</p>
+    </div>
+    <div class="brief" id="brief">
+      <div class="brief-card"><h4><span class="k">ORBITAL</span> International Space Station</h4><p class="loading">waiting for ISS telemetry…</p></div>
+      <div class="brief-card"><h4><span class="k">MANIFEST</span> Launch reliability</h4><p class="loading">waiting for the launch manifest…</p></div>
+      <div class="brief-card"><h4><span class="k">PLANETARY DEFENSE</span> Near-Earth objects</h4><p class="loading">waiting for the NEO feed…</p></div>
+      <div class="brief-card"><h4><span class="k">MARS OPS</span> Rover status</h4><p class="loading">waiting for rover data…</p></div>
+      <div class="brief-card" style="grid-column:1/-1"><h4><span class="k">SKY</span> Tonight's picture</h4><p class="loading">waiting for APOD…</p></div>
+    </div>
+  </section>
+
+  <!-- ============ NEXT 24 HOURS (view) ============ -->
+  <section class="view" id="view-timeline">
+    <div class="view-head">
+      <h2>Next 24 Hours</h2>
+      <p>Everything scheduled inside the next turn of the clock, assembled from feeds the console is already holding — upcoming launches, the station's passes over your viewpoint, NOAA's 3-day Kp forecast and active storms — with an hour-by-hour breakdown and one ordered list. Press <b>t</b> from anywhere.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h3>◷ The next 24 hours</h3>
+        <span class="meta" id="tl-meta">—</span>
+        <button class="btn icon" id="tl-refresh" style="margin-left:auto" title="Rebuild the timeline from the live feeds" aria-label="Refresh the 24-hour timeline">↻</button>
+      </div>
+      <div class="card-body">
+    <div class="tl-d-sec">
+      <span class="tl-legend" aria-hidden="true">
+        <span><i style="background:var(--accent)"></i>launch</span>
+        <span><i style="background:var(--accent-2)"></i>ISS pass</span>
+        <span><i style="background:var(--warm)"></i>Kp window</span>
+        <span><i style="background:var(--hot)"></i>storm</span>
+      </span>
+      <span class="loading" id="tl-note">collecting scheduled events…</span>
+    </div>
+    <div class="tl-d-sec">
+      <div class="tl-track" id="tl-track" role="img" aria-label="Timeline of the next 24 hours"></div>
+    </div>
+    <div class="tl-d-sec">
+      <h4>Hour by hour <span id="tl-hours-meta">—</span></h4>
+      <div class="tl-hours" id="tl-hours"></div>
+    </div>
+    <div class="tl-d-sec">
+      <h4>In order</h4>
+      <div class="tl-list" id="tl-list"></div>
+    </div>
+    <div class="tl-d-sec">
+      <h4>Where this comes from</h4>
+      <p class="dd-note" style="margin-top:0">Every row is derived from state the console <b>already holds</b> — the launch manifest, the ISS pass list and NOAA's 3-day Kp forecast — so the panel costs no API calls of its own. Kp is published in <b>3-hour bins</b> (00–03Z, 03–06Z…), so the value shown against an hour is the forecast for the bin that contains it, not an hourly prediction. Storms are pinned to <b>now</b>: their only forward-facing timestamp is the next advisory, which the public feeds do not publish, and inventing one would read as a scheduled event.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SPACE JELLYFISH (view) ============ -->
+  <section class="view" id="view-jellyfish">
+    <div class="view-head">
+      <h2>Space Jellyfish</h2>
+      <p>A rocket's exhaust plume caught in sunlight from beyond the horizon — a lighting condition rather than anything about the vehicle. Give this page a viewpoint and it works out which launches would put a lit plume in your sky, how far away it would be, which way to look, and how high it would ride over your horizon.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h3>🌊 Sighting outlook</h3>
+        <span class="meta" id="jf-meta">—</span>
+        <button class="btn icon" id="jf-refresh" style="margin-left:auto" title="Recompute every twilight window from the manifest" aria-label="Recompute the jellyfish sighting outlook">↻</button>
+      </div>
+      <div class="card-body">
+    <div class="tl-d-sec">
+      <h4>Your viewpoint <span id="jf-ob-meta">—</span></h4>
+      <div class="jf-pick">
+        <input type="text" class="ctl" id="jf-place" placeholder="type a place — city, town or region" spellcheck="false" autocomplete="off" aria-label="Search for a place to work out jellyfish visibility from" aria-describedby="jf-ob-line" />
+        <button class="btn primary" id="jf-place-go" aria-label="Search for that place">find</button>
+      </div>
+      <div class="jf-hits" id="jf-hits" hidden></div>
+      <div class="jf-ob2">
+        <label>LAT <input type="number" class="ctl" id="jf-lat" step="0.0001" min="-90" max="90" placeholder="—" aria-label="Viewpoint latitude in decimal degrees" /></label>
+        <label>LON <input type="number" class="ctl" id="jf-lon" step="0.0001" min="-180" max="180" placeholder="—" aria-label="Viewpoint longitude in decimal degrees" /></label>
+        <button class="btn" id="jf-geo" aria-label="Use my device location to check whether a plume would be visible from here">📍 use my location</button>
+        <button class="btn" id="jf-clear" title="Back to the console's own starting coordinates" aria-label="Reset the viewpoint to the console default">reset</button>
+      </div>
+      <p id="jf-ob-line" style="margin:0 0 10px;font-size:12px;color:var(--text-3);line-height:1.6">
+        viewpoint · <span class="mono" id="jf-ob-coords">not set</span>
+      </p>
+      <div class="jf-chips" id="jf-presets" role="group" aria-label="Quick viewpoints at the pads in the live manifest"></div>
+      <div class="jf-row">
+        <button class="btn" id="jf-visible" aria-pressed="false" title="List only the launches whose plume would actually be in your sky">only what I could see: off</button>
+        <span class="loading" id="jf-note">waiting on the manifest</span>
+      </div>
+      <div class="jf-arc" id="jf-arc">No launch in the window yet — this line states which places on the ground the next plume could be seen from.</div>
+    </div>
+
+    <div class="tl-d-sec">
+      <h4>Launch by launch</h4>
+      <p style="margin:0 0 12px;font-size:12.5px;color:var(--text-3);line-height:1.65">The vehicle, the twilight band at the pad at lift-off, and what the plume would look like from the viewpoint above — the <b>distance</b>, <b>which way to look</b>, how high it rides over your horizon, and your own solar elevation. All of it is computed from the pad's latitude and longitude; no feed supplies it. The viewpoint is the same one the <b>ISS pass predictor</b> uses, so the console keeps a single observer rather than two that disagree.</p>
+      <div id="jf-watch"><div class="empty">Waiting on the launch manifest…</div></div>
+    </div>
+    <div class="tl-d-sec">
+      <h4>The phenomenon</h4>
+      <div class="dd">
+        <div class="jf-art" role="img" aria-label="Diagram: a rocket exhaust plume at high altitude lit by the Sun from beyond the horizon, while the observer below stands in twilight and darkness">
+          <div class="cone"></div>
+          <div class="arc"></div>
+          <span class="lbl sun">☀ sunlight still strikes 100–300 km</span>
+          <span class="lbl earth">observer below in twilight → dark sky</span>
+        </div>
+        <p>A <b>space jellyfish</b> — also called the <i>twilight phenomenon</i> — is a rocket's exhaust plume seen lit from below the horizon. It needs two things to be true at once, in different places:</p>
+        <ul>
+          <li>The <b>observer</b> is already in twilight, so the sky above them is dark enough to see detail; and</li>
+          <li>the <b>rocket</b>, 100–300 km up, is still in direct sunlight, because at that altitude it is far enough over the curve of the Earth to catch the Sun while the ground below is in shadow.</li>
+        </ul>
+        <p>In near-vacuum the exhaust does not stay a tight tail. It <b>expands freely</b>, ballooning to tens of kilometres across, and the thin residuals glow as the gas is excited by sunlight. The result reads as a bell-shaped head with trailing tentacles — hence the name. The expanding shock front can also light up as a <b>faint halo or ring</b> around the head, which is why good photographs often look like a ringed nebula rather than a plume.</p>
+        <p>Nothing about the rocket is special; the geometry is. The same launch at noon shows an ordinary white plume and the same launch at 2 a.m. shows nothing at all. There is no engine type, fuel or vehicle that produces a jellyfish — it is entirely a question of where the Sun is.</p>
+        <p><b>Where it is visible from.</b> Two windows in every day:</p>
+        <ul>
+          <li><b>Roughly 20–60 minutes after local sunset</b>, or <b>20–60 minutes before local sunrise</b>. This is when the ground is dark but the atmosphere at 200 km is still sunlit. It is the only time the effect exists — judged here by the Sun's elevation at the pad, which is why the bands in the outlook are twilight only.</li>
+          <li><b>50–300 km</b> from the pad gives the classic overhead view, and it has been seen from well over <b>500 km</b> away during the high-altitude phase. "Too far" is less limiting than people assume — line of sight to the horizon matters more than distance, which is why the outlook reports the bearing to look along and the plume's height above your own horizon rather than a simple yes.</li>
+          <li>The reach is <b>direction-dependent, not a radius</b>. At one instant the Sun's elevation is fixed, so the ground that is dark enough is the half of the map away from the Sun, and the day side of the pad can be lit within a few hundred kilometres. Every row therefore quotes a <b>sighting band</b> measured direction by direction — often something like “1,200 km in most directions, but only 300 km to the east” — and the side named as short is the side the Sun is rising or setting on, which flips between dawn and dusk at the same pad.</li>
+          <li><b>Low horizon, clear sky, no moon.</b> Light pollution fogs the low sky exactly where the phenomenon sits, so a dark site with an unobstructed view in the direction of the pad is worth more than proximity.</li>
+        </ul>
+        <p class="dd-note">It is not the same as a <b>noctilucent cloud</b> (ice crystals at 80 km, polar summer only) or a <b>rocket’s re-entry burn</b>. Nor is it a failure or an anomaly — it is a lighting condition, and it appears most often on perfectly nominal launches.</p>
+      </div>
+    </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span>Data: NASA (APOD, Image Library, NeoWs, Mars Rover Photos), NASA EPIC (DSCOVR), NASA DONKI &amp; EONET, NOAA SWPC, Launch Library 2, Where the ISS at?</span>
+    <span>Imagery and broadcasts are used under the respective agencies' media-usage guidelines (<a href="https://www.nasa.gov/nasa-brand-center/images-and-media/" target="_blank" rel="noopener noreferrer">NASA</a>) · this console is <b>not affiliated with or endorsed by</b> NASA, ESA or any agency, and no endorsement is implied.</span>
+    <span>Demo keys are rate-limited; feeds refresh on load.</span>
+  </footer>
+
+</main>
+
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal">
+    <button class="m-close" id="modalClose" title="Close" aria-label="Close media viewer">✕</button>
+    <div class="m-media" id="modalMedia"><img id="modalImg" alt="" /></div>
+    <div class="m-body">
+      <h4 id="modalTitle"></h4>
+      <div class="m-meta" id="modalMeta"></div>
+      <p id="modalText"></p>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<div class="modal-backdrop" id="keyModalBackdrop">
+  <div class="modal" style="max-width:520px">
+    <div class="m-body">
+      <h4>NASA API key</h4>
+      <div class="m-meta">Free at api.nasa.gov — raises limits from ~30 to 1,000+ requests per hour and restores live APOD, NeoWs and rover feeds.</div>
+      <input type="text" id="keyInput" class="ctl" style="width:100%" placeholder="Paste your api.nasa.gov key…" aria-label="NASA API key" spellcheck="false" />
+      <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+        <button class="btn primary" id="keySave">Save &amp; reload feeds</button>
+        <button class="btn" id="keyUseDemo">Use shared demo key</button>
+        <button class="btn" id="keyCancel" style="margin-left:auto">Cancel</button>
+      </div>
+      <p style="font-size:11.5px;color:var(--text-3);margin:12px 0 0">The key is stored only in this browser (localStorage) and is sent solely to api.nasa.gov. The shared <span class="mono">DEMO_KEY</span> is heavily throttled by everyone using it. <b>Never</b> paste a key you cannot rotate into a page you do not host — anyone with access to this browser profile can read it back.</p>
+      <p style="font-size:11.5px;color:var(--text-3);margin:10px 0 0">Offline cache: <span class="mono" id="sw-status">checking…</span></p>
+    </div>
+  </div>
+</div>
+
+<!-- mission dossier: what is going up, on what, and how the countdown stands -->
+<div class="modal-backdrop" id="mmBackdrop">
+  <div class="modal mm" role="dialog" aria-modal="true" aria-labelledby="mmTitle">
+    <button class="m-close" id="mmClose" title="Close" aria-label="Close the mission dossier">✕</button>
+    <div class="mm-head">
+      <div class="mm-topline">
+        <span class="badge" id="mmStatus">—</span>
+        <span class="mm-net" id="mmNet">—</span>
+      </div>
+      <h4 id="mmTitle">—</h4>
+      <div class="m-meta" id="mmSub">—</div>
+      <div class="mm-rocket" id="mmRocket" hidden></div>
+    </div>
+    <div class="mm-count">
+      <div><div class="lbl" id="mmCountLbl">T-minus</div><div class="t" id="mmCount">—</div></div>
+      <div><div class="lbl">Launch window</div><div class="t" id="mmWindow" style="font-size:13px">—</div></div>
+      <div class="sync" id="mmSync">—</div>
+    </div>
+    <div class="mm-body">
+      <div id="mmNotice" role="status" hidden></div>
+      <div class="mm-grid" id="mmGrid"></div>
+      <h5 class="mm-h">Payload &amp; objectives</h5>
+      <div id="mmPayload"><p class="mm-text">loading the manifest entry…</p></div>
+      <h5 class="mm-h">Vehicle &amp; stage breakdown</h5>
+      <div id="mmStages"><p class="mm-text">loading the vehicle data…</p></div>
+      <h5 class="mm-h">Countdown status</h5>
+      <div id="mmTimeline"><p class="mm-text">loading the countdown sequence…</p></div>
+      <div id="mmJellyfish" hidden></div>
+      <div class="mm-actions" id="mmActions"></div>
+      <div class="mm-note" id="mmNote"></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script type="module" src="js/app.js"></script>
+
+</body>
+</html>
